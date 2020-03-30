@@ -593,11 +593,7 @@ public extension Double {
      Return the rounded result of a Double with certain digits after decimal.
      */
     func rounded(digitsAfterDecimal digit: Int) -> Double{
-        let power = Double.pow(10, Double(digit))
-        var x = self * power
-        x.round()
-        x = x / power
-        return x
+        return Double(String(format: "%.\(digit)f", self)) ?? 0
     }
     
     /**

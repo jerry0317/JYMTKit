@@ -1997,6 +1997,21 @@ public extension Collection where Iterator.Element == Atom {
     }
     
     /**
+     Possible combinations of atoms after resigining **(Cartesian Product used)**
+     */
+    func possibleCombinations(firstAtomFixed: Bool = false) -> [[Atom]] {
+        guard self.count > 0 else {
+            return [[Atom]]()
+        }
+        let firstIndex = firstAtomFixed ? 1 : 0
+        var possibles = firstAtomFixed ? [[self.first!]] : [[Atom]]()
+        for i in firstIndex..<self.count {
+            possibles.append(self[i as! Self.Index].possibles)
+        }
+        return possibles.cartesianProduct()
+    }
+    
+    /**
      The center of mass of several atoms
      */
     var centerOfMass: Vector3D {

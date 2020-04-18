@@ -743,7 +743,7 @@ public extension Array {
     }
 }
 
-extension Array where Element : RangeReplaceableCollection {
+public extension Array where Element : RangeReplaceableCollection {
 
     typealias InnerCollection = Element
     typealias InnerElement = InnerCollection.Iterator.Element

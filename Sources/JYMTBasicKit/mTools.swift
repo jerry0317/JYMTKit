@@ -1775,7 +1775,7 @@ public func strcMoleculeConstructorSTS(
         if filters.contains(.distanceRange) {
             if distanceRange != nil {
                 let range = distanceRange!
-                let distanceRangeCheck = stMol.atoms.filter({ !distanceRangeFilter(atom, $0, range: range)}).isEmpty
+                let distanceRangeCheck = !stMol.atoms.filter({ distanceRangeFilter(atom, $0, range: range)}).isEmpty
                 if !distanceRangeCheck {
                     mol.score!.append(dev: StrcDeviation.failure, filter: .distanceRange)
                     return mol

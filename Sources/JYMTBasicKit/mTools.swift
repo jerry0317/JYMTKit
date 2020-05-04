@@ -830,19 +830,23 @@ public struct VSEPRGraph: SubChemBondGraph {
     /**
      A filter to determine if this VSEPR graph is valid.
      */
-    public func filter(tolRatio: Double = 0.1, csTolRatio: Double? = nil, copTolRange: Double = 0.01) -> Bool {
-        let sts = filterSTS(tolRatio: tolRatio, csTolRatio: csTolRatio, copTolRange: copTolRange)
+    public func filter(filters: Set<StrcFilter> = [.bondAngle, .coplanarity, .valence], tolRatio: Double = 0.1, csTolRatio: Double? = nil, copTolRange: Double = 0.01) -> Bool {
+        let sts = filterSTS(filters: filters, tolRatio: tolRatio, csTolRatio: csTolRatio, copTolRange: copTolRange)
         return !sts.map({ $1.isValid }).contains(false)
     }
     
-    public func filterSTS(tolRatio: Double = 0.1, csTolRatio: Double? = nil, copTolRange: Double = 0.01) -> [StrcDevTuple] {
+    public func filterSTS(filters: Set<StrcFilter> = [.bondAngle, .coplanarity, .valence], tolRatio: Double = 0.1, csTolRatio: Double? = nil, copTolRange: Double = 0.01) -> [StrcDevTuple] {
         var rList = [StrcDevTuple]()
         
-        if (center.valence - valenceOccupied) < 0 {
-            rList.append((.valence, StrcDeviation(false, Double(valenceOccupied - center.valence))))
-        } else {
-            rList.append((.valence, StrcDeviation.success))
+//        Valence Filter
+        if filters.contains(.valence){
+            if (center.valence - valenceOccupied) < 0 {
+                rList.append((.valence, StrcDeviation(false, Double(valenceOccupied - center.valence))))
+            } else {
+                rList.append((.valence, StrcDeviation.success))
+            }
         }
+        
         let vType = type
         switch vType {
         case .ax2e0, .ax2e1, .ax2e2, .ax3e0, .ax3e1, .ax4e0:
@@ -868,13 +872,20 @@ public struct VSEPRGraph: SubChemBondGraph {
                 break
             }
             
-            let baDev = bondAnglesFilterSTS(center: center, attached: attached, range: range, tolRatio: tolRatio)
-            rList.append((.bondAngle, baDev))
-            
-            if degree == 3 && copRange != nil {
-                let d3Dev = degreeThreeAtomPlanarDistanceFilterSTS(center: center, attached: attached, range: copRange!, tolLevel: copTolRange)
-                rList.append((.coplanarity, d3Dev))
+//            Bond Angle Filter
+            if filters.contains(.bondAngle) {
+                let baDev = bondAnglesFilterSTS(center: center, attached: attached, range: range, tolRatio: tolRatio)
+                rList.append((.bondAngle, baDev))
             }
+            
+//            Coplanarity Filter
+            if filters.contains(.coplanarity) {
+                if degree == 3 && copRange != nil {
+                    let d3Dev = degreeThreeAtomPlanarDistanceFilterSTS(center: center, attached: attached, range: copRange!, tolLevel: copTolRange)
+                    rList.append((.coplanarity, d3Dev))
+                }
+            }
+            
             
 //            if !completelySymmetricFilter(tolRatio: csRatio) {
 //                return false
@@ -1017,6 +1028,7 @@ public enum StrcFilter {
     case bondAngle
     case coplanarity
     case valence
+    case distanceRange
     case fatalError
 }
 
@@ -1103,6 +1115,7 @@ public extension StrcScore {
         .coplanarity: 100,
         .valence: 200,
         // Miscellaneous
+        .distanceRange: 100,
         .fatalError: Double.infinity
     ]
 }
@@ -1549,6 +1562,28 @@ public func minimumBondLengthFilterSTS(_ atom1: Atom, _ atom2: Atom, tolRange: D
 }
 
 /**
+ A filter to filter out if two atoms are not in the given distance closed range.
+ */
+public func distanceRangeFilter(_ atom1: Atom, _ atom2: Atom, range: ClosedRange<Double>) -> Bool {
+    return distanceRangeFilterSTS(atom1, atom2, range: range).isValid
+}
+
+public func distanceRangeFilter(_ atom1: Atom, _ atom2: Atom, min: Double, max: Double) -> Bool {
+    return distanceRangeFilterSTS(atom1, atom2, min: min, max: max).isValid
+}
+
+public func distanceRangeFilterSTS(_ atom1: Atom, _ atom2: Atom, range: ClosedRange<Double>) -> StrcDeviation {
+    guard let atomd = atomDistance(atom1, atom2) else {
+        return StrcDeviation.failure
+    }
+    return range.contains(atomd) ? StrcDeviation.success : StrcDeviation.failure
+}
+
+public func distanceRangeFilterSTS(_ atom1: Atom, _ atom2: Atom, min: Double, max: Double) -> StrcDeviation {
+    distanceRangeFilterSTS(atom1, atom2, range: min...max)
+}
+
+/**
  (D3APD filter) A filter to filter out if a degree-3 atom is "out of plane" based on a given range.
  */
 public func degreeThreeAtomPlanarDistanceFilter(center: Atom, attached: [Atom], range: ClosedRange<Double>, tolLevel: Double = 0.01) -> Bool {
@@ -1584,7 +1619,14 @@ public func degreeThreeAtomPlanarDistanceFilterSTS(center: Atom, attached: [Atom
  - Parameter tolRatio: The tolerance ratio acting in bond angle filters. Reference with the VSEPR graph.
  
  */
-public func strcMoleculeConstructor(stMol: StrcMolecule, atom: Atom, tolRange: Double = 0.1, tolRatio: Double = 0.1) -> StrcMolecule {
+public func strcMoleculeConstructor(
+    stMol: StrcMolecule,
+    atom: Atom,
+    filters: Set<StrcFilter> = [.minimumBondLength, .bondTypeLength, .bondAngle, .coplanarity, .valence],
+    tolRange: Double = 0.1,
+    tolRatio: Double = 0.1,
+    distanceRange: ClosedRange<Double>? = nil
+) -> StrcMolecule {
     var mol = stMol
     let bondGraphs = mol.bondGraphs
     
@@ -1592,63 +1634,91 @@ public func strcMoleculeConstructor(stMol: StrcMolecule, atom: Atom, tolRange: D
         mol.addAtom(atom)
     } else {
         mol.bondGraphs.removeAll()
-        
+
         // Step 1: Make sure the new atom is not too close to any of the existing atoms.
-        let minimumBDLCheck = stMol.atoms.filter({ !minimumBondLengthFilter(atom, $0, tolRange: tolRange) }).isEmpty
-        if !minimumBDLCheck {
-            return mol
+        if filters.contains(.minimumBondLength) {
+            let minimumBDLCheck = stMol.atoms.filter({ !minimumBondLengthFilter(atom, $0, tolRange: tolRange) }).isEmpty
+            if !minimumBDLCheck {
+                return mol
+            }
         }
+        
         
         // Step 2: Find all the possible bond connections between the new atom and any of the existing atoms.
         var possibleBondsCollected: [[ChemBond]] = []
         
-        // Step 2.1: Find possible new bond connections of each existing atom.
-        for vAtom in stMol.atoms {
-            let possibleBts = possibleBondTypesDynProgrammed(vAtom.element, atom.element)
-            var possibleBonds = [ChemBond]()
-            for bondType in possibleBts {
-                if !bondTypeLengthFilter(vAtom, atom, bondType, tolRange) {
-                    continue
-                } else {
-                    let pBond = ChemBond(vAtom, atom, bondType)
-                    possibleBonds.append(pBond)
+        if filters.contains(.bondTypeLength) {
+            // Step 2.1: Find possible new bond connections of each existing atom.
+            for vAtom in stMol.atoms {
+                let possibleBts = possibleBondTypesDynProgrammed(vAtom.element, atom.element)
+                var possibleBonds = [ChemBond]()
+                for bondType in possibleBts {
+                    if !bondTypeLengthFilter(vAtom, atom, bondType, tolRange) {
+                        continue
+                    } else {
+                        let pBond = ChemBond(vAtom, atom, bondType)
+                        possibleBonds.append(pBond)
+                    }
+                }
+                if !possibleBonds.isEmpty {
+                    possibleBondsCollected.append(possibleBonds)
                 }
             }
-            if !possibleBonds.isEmpty {
-                possibleBondsCollected.append(possibleBonds)
+            
+            // Step 2.2: Find the Cartesian product of the collected possible bonds.
+            if possibleBondsCollected.isEmpty {
+                return mol
             }
         }
         
-        // Step 2.2: Find the Cartesian product of the collected possible bonds.
-        if possibleBondsCollected.isEmpty {
-            return mol
+        // Distance Range Filter
+        if filters.contains(.distanceRange) {
+            if distanceRange != nil {
+                let range = distanceRange!
+                let distanceRangeCheck = stMol.atoms.filter({ !distanceRangeFilter(atom, $0, range: range)}).isEmpty
+                if !distanceRangeCheck {
+                    return mol
+                }
+            }
         }
         
-        // Step 3: Perform VSEPR filter on each of the possible Cartesian combination of the bonds.
         mol.addAtom(atom)
         
-        for pBonds in possibleBondsCollected.cartesianProduct() {
-            if stMol.size == 1 {
-                mol.bondGraphs.insert(ChemBondGraph(pBonds))
-            } else if stMol.size > 1 {
-                outer: for bondGraph in bondGraphs {
-                    var pBondGraph = bondGraph
-                    pBondGraph.bonds.formUnion(pBonds)
-                    for bAtom in mol.atoms {
-                        let vseprGraph = pBondGraph.findVseprGraph(bAtom)
-                        if !vseprGraph.filter(tolRatio: tolRatio, copTolRange: tolRange) {
-                            continue outer
+        if !filters.intersection([.bondAngle, .coplanarity, .valence]).isEmpty {
+            // Step 3: Perform VSEPR filter on each of the possible Cartesian combination of the bonds.
+            for pBonds in possibleBondsCollected.cartesianProduct() {
+                if stMol.size == 1 {
+                    mol.bondGraphs.insert(ChemBondGraph(pBonds))
+                } else if stMol.size > 1 {
+                    outer: for bondGraph in bondGraphs {
+                        var pBondGraph = bondGraph
+                        pBondGraph.bonds.formUnion(pBonds)
+                        for bAtom in mol.atoms {
+                            let vseprGraph = pBondGraph.findVseprGraph(bAtom)
+                            if !vseprGraph.filter(filters: filters, tolRatio: tolRatio, copTolRange: tolRange) {
+                                continue outer
+                            }
                         }
+                        mol.bondGraphs.insert(pBondGraph)
                     }
-                    mol.bondGraphs.insert(pBondGraph)
                 }
             }
         }
+        
+        
     }
     return mol
 }
 
-public func strcMoleculeConstructorSTS(stMol: StrcMolecule, atom: Atom, tolRange: Double, tolRatio: Double = 0.1, baseScore: Double = 100) -> StrcMolecule {
+public func strcMoleculeConstructorSTS(
+    stMol: StrcMolecule,
+    atom: Atom,
+    filters: Set<StrcFilter> = [.minimumBondLength, .bondTypeLength, .bondAngle, .coplanarity, .valence],
+    tolRange: Double,
+    tolRatio: Double = 0.1,
+    baseScore: Double = 100,
+    distanceRange: ClosedRange<Double>? = nil
+) -> StrcMolecule {
     var mol = stMol
     let bondGraphs = mol.bondGraphs
     
@@ -1662,81 +1732,104 @@ public func strcMoleculeConstructorSTS(stMol: StrcMolecule, atom: Atom, tolRange
         }
         
         // Step 1: Make sure the new atom is not too close to any of the existing atoms.
-        for sAtom in stMol.atoms {
-            let mStDev = minimumBondLengthFilterSTS(atom, sAtom, tolRange: tolRange)
-            mol.score!.append(dev: mStDev, filter: .minimumBondLength)
-            if !mol.isValid {
-                return mol
+        if filters.contains(.minimumBondLength) {
+            for sAtom in stMol.atoms {
+                let mStDev = minimumBondLengthFilterSTS(atom, sAtom, tolRange: tolRange)
+                mol.score!.append(dev: mStDev, filter: .minimumBondLength)
+                if !mol.isValid {
+                    return mol
+                }
             }
         }
         
         // Step 2: Find all the possible bond connections between the new atom and any of the existing atoms.
         var possibleBondsCollected: [[(ChemBond, StrcDeviation)]] = []
-        
-        // Step 2.1: Find possible new bond connections of each existing atom.
-        for vAtom in stMol.atoms {
-            let possibleBts = possibleBondTypesDynProgrammed(vAtom.element, atom.element)
-            var possibleBonds = [(ChemBond, StrcDeviation)]()
-            for bondType in possibleBts {
-                let bStDev = bondTypeLengthFilterSTS(vAtom, atom, bondType, tolRange)
-                var intScore = mol.score!
-                intScore.append(dev: bStDev, filter: .bondTypeLength)
-                if !intScore.isValid {
-                    continue
-                } else {
-                    let pBond = ChemBond(vAtom, atom, bondType)
-                    possibleBonds.append((pBond, bStDev))
+        if filters.contains(.bondTypeLength) {
+            // Step 2.1: Find possible new bond connections of each existing atom.
+            for vAtom in stMol.atoms {
+                let possibleBts = possibleBondTypesDynProgrammed(vAtom.element, atom.element)
+                var possibleBonds = [(ChemBond, StrcDeviation)]()
+                for bondType in possibleBts {
+                    let bStDev = bondTypeLengthFilterSTS(vAtom, atom, bondType, tolRange)
+                    var intScore = mol.score!
+                    intScore.append(dev: bStDev, filter: .bondTypeLength)
+                    if !intScore.isValid {
+                        continue
+                    } else {
+                        let pBond = ChemBond(vAtom, atom, bondType)
+                        possibleBonds.append((pBond, bStDev))
+                    }
+                }
+                if !possibleBonds.isEmpty {
+                    possibleBondsCollected.append(possibleBonds)
                 }
             }
-            if !possibleBonds.isEmpty {
-                possibleBondsCollected.append(possibleBonds)
+            
+            // Step 2.2: Find the Cartesian product of the collected possible bonds.
+            if possibleBondsCollected.isEmpty {
+                return mol
             }
         }
         
-        // Step 2.2: Find the Cartesian product of the collected possible bonds.
-        if possibleBondsCollected.isEmpty {
-            return mol
+        // Distance Range Filter
+        if filters.contains(.distanceRange) {
+            if distanceRange != nil {
+                let range = distanceRange!
+//                let distanceRangeCheck = stMol.atoms.filter({ !distanceRangeFilter(atom, $0, range: range)}).isEmpty
+//                if !distanceRangeCheck {
+//                    return mol
+//                }
+                for sAtom in stMol.atoms {
+                    let dsDev = distanceRangeFilterSTS(atom, sAtom, range: range)
+                    mol.score!.append(dev: dsDev, filter: .distanceRange)
+                    if !mol.isValid {
+                        return mol
+                    }
+                }
+            }
         }
         
         // Step 3: Perform VSEPR filter on each of the possible Cartesian combination of the bonds.
         mol.addAtom(atom)
         
-        for pBondDevCombo in possibleBondsCollected.cartesianProduct() {
-            let (pBonds, pDevs) = pBondDevCombo.reduce(into: ([ChemBond](), [StrcDevTuple]()), {
-                $0.0.append($1.0)
-                $0.1.append((.bondTypeLength, $1.1))
-            })
-            if stMol.size == 1 {
-                var newBondGraph = ChemBondGraph(pBonds)
-                newBondGraph.score = StrcScore(base: 100)
-                newBondGraph.score!.append(contentsOf: pDevs)
-                if newBondGraph.isValid {
-                    mol.bondGraphs.insert(newBondGraph)
-                }
-            } else if stMol.size > 1 {
-                outer: for bondGraph in bondGraphs {
-                    var pBondGraph = bondGraph
-                    if pBondGraph.score == nil {
-                        pBondGraph.score = StrcScore(base: 100)
+        if !filters.intersection([.bondAngle, .coplanarity, .valence]).isEmpty {
+            for pBondDevCombo in possibleBondsCollected.cartesianProduct() {
+                let (pBonds, pDevs) = pBondDevCombo.reduce(into: ([ChemBond](), [StrcDevTuple]()), {
+                    $0.0.append($1.0)
+                    $0.1.append((.bondTypeLength, $1.1))
+                })
+                if stMol.size == 1 {
+                    var newBondGraph = ChemBondGraph(pBonds)
+                    newBondGraph.score = StrcScore(base: 100)
+                    newBondGraph.score!.append(contentsOf: pDevs)
+                    if newBondGraph.isValid {
+                        mol.bondGraphs.insert(newBondGraph)
                     }
-                    var intScore = pBondGraph.score!
-                    intScore.append(contentsOf: pDevs)
-                    
-                    guard intScore.isValid else {
-                        continue outer
-                    }
-                    
-                    pBondGraph.score = intScore
-                    pBondGraph.bonds.formUnion(pBonds)
-                    for bAtom in mol.atoms {
-                        let vseprGraph = pBondGraph.findVseprGraph(bAtom)
-                        let vStDevs = vseprGraph.filterSTS(tolRatio: tolRatio, copTolRange: tolRange)
-                        pBondGraph.score!.append(contentsOf: vStDevs)
-                        if !pBondGraph.isValid {
+                } else if stMol.size > 1 {
+                    outer: for bondGraph in bondGraphs {
+                        var pBondGraph = bondGraph
+                        if pBondGraph.score == nil {
+                            pBondGraph.score = StrcScore(base: 100)
+                        }
+                        var intScore = pBondGraph.score!
+                        intScore.append(contentsOf: pDevs)
+                        
+                        guard intScore.isValid else {
                             continue outer
                         }
+                        
+                        pBondGraph.score = intScore
+                        pBondGraph.bonds.formUnion(pBonds)
+                        for bAtom in mol.atoms {
+                            let vseprGraph = pBondGraph.findVseprGraph(bAtom)
+                            let vStDevs = vseprGraph.filterSTS(filters: filters, tolRatio: tolRatio, copTolRange: tolRange)
+                            pBondGraph.score!.append(contentsOf: vStDevs)
+                            if !pBondGraph.isValid {
+                                continue outer
+                            }
+                        }
+                        mol.bondGraphs.insert(pBondGraph)
                     }
-                    mol.bondGraphs.insert(pBondGraph)
                 }
             }
         }
@@ -1748,15 +1841,27 @@ public func strcMoleculeConstructorSTS(stMol: StrcMolecule, atom: Atom, tolRange
 /**
  The recursion constructor. It takes a test atom and compared it with a valid structrual molecule. It will return the possible structural molecules as the atom and the molecule join together.
  */
-public func rcsConstructor(atom: Atom, stMol: StrcMolecule, tolRange: Double = 0.1, tolRatio: Double = 0.1, testMode: Bool = false) -> [StrcMolecule] {
+public func rcsConstructor(
+    atom: Atom,
+    stMol: StrcMolecule,
+    filters: Set<StrcFilter> = [.minimumBondLength, .bondTypeLength, .bondAngle, .coplanarity, .valence],
+    tolRange: Double = 0.1,
+    tolRatio: Double = 0.1,
+    distanceRange: ClosedRange<Double>? = nil,
+    testMode: Bool = false
+) -> [StrcMolecule] {
     let possibleAtoms = testMode ? [atom] : atom.possibles
     var possibleSMList: [StrcMolecule] = []
     
     for pAtom in possibleAtoms {
         // To be STS-ize
-        let sMol = strcMoleculeConstructorSTS(stMol: stMol, atom: pAtom, tolRange: tolRange, tolRatio: tolRatio)
+        let sMol = strcMoleculeConstructorSTS(stMol: stMol, atom: pAtom, filters: filters, tolRange: tolRange, tolRatio: tolRatio, distanceRange: distanceRange)
         
-        if !sMol.bondGraphs.isEmpty {
+        if !filters.intersection([.bondAngle, .coplanarity, .valence]).isEmpty {
+            if !sMol.bondGraphs.isEmpty {
+                possibleSMList.append(sMol)
+            }
+        } else {
             possibleSMList.append(sMol)
         }
     }
@@ -1813,7 +1918,16 @@ public func rcsAction(rAtoms: [Atom], stMolList mList: [StrcMolecule], tolRange:
 /**
  The iteration version of the `rcsAction` for faster and clearer computations. Memoized dynamic progamming is implemented for utilization.
  */
-public func rcsActionDynProgrammed(rAtoms: [Atom], stMolList mList: [StrcMolecule], tolRange: Double = 0.01, tolRatio: Double = 0.1, trueMol: StrcMolecule? = nil, testMode: Bool = false) -> [StrcMolecule] {
+public func rcsActionDynProgrammed(
+    rAtoms: [Atom],
+    stMolList mList: [StrcMolecule],
+    filters: Set<StrcFilter> = [.minimumBondLength, .bondTypeLength, .bondAngle, .coplanarity, .valence],
+    tolRange: Double = 0.01,
+    tolRatio: Double = 0.1,
+    trueMol: StrcMolecule? = nil,
+    distanceRange: ClosedRange<Double>? = nil,
+    testMode: Bool = false
+) -> [StrcMolecule] {
     guard !rAtoms.isEmpty else {
         return []
     }
@@ -1857,7 +1971,7 @@ public func rcsActionDynProgrammed(rAtoms: [Atom], stMolList mList: [StrcMolecul
             for stMol in stMols {
                 let rList = rAtoms.filter { !stMol.containsById($0) }
                 for rAtom in rList {
-                    let newMList = rcsConstructor(atom: rAtom, stMol: stMol, tolRange: tolRange, tolRatio: tolRatio, testMode: testMode)
+                    let newMList = rcsConstructor(atom: rAtom, stMol: stMol, filters: filters, tolRange: tolRange, tolRatio: tolRatio, distanceRange: distanceRange, testMode: testMode)
                     
                     for newStMol in newMList {
                         if globalCache.stMolMatched.0.contains(newStMol.atoms) {

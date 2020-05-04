@@ -1861,7 +1861,7 @@ public func rcsConstructor(
             if !sMol.bondGraphs.isEmpty {
                 possibleSMList.append(sMol)
             }
-        } else {
+        } else if sMol.isValid {
             possibleSMList.append(sMol)
         }
     }

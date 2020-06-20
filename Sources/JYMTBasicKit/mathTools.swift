@@ -614,6 +614,14 @@ public extension Array {
             Array(self[$0 ..< Swift.min($0 + size, count)])
         }
     }
+    
+    /**
+    Separate an array into a 2-D array with the number of sub-arrays specified.
+    */
+    func chunked(by num: Int) -> [[Element]] {
+        let size = Int((Double(self.count) / Double(num)).rounded())
+        return chunked(into: size)
+    }
 }
 
 public extension Array where Element == Double {

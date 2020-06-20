@@ -129,6 +129,9 @@ public func exportingPathInput(_ name: String = "", isOptional: Bool = true) -> 
             saveResults = false
             print("The results will not be saved.")
             return true
+        } else if writePathInput.isEmpty && !isOptional {
+            print("The directory path can not be empty.")
+            return false
         } else {
             let writePathUrl = URL(fileURLWithPath: writePathInput)
             guard writePathUrl.hasDirectoryPath else {

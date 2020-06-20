@@ -26,7 +26,7 @@ public func input(name: String, type: String, defaultValue: Any? = nil, intRange
         let response = readLine()
         var inputConverted: Any?
         guard let r: String = response else {
-            fatalError("Fatal Error: got nil response. Program exited.")
+            fatalError("got nil response. Program exited.")
         }
         
         if defaultValue != nil && r.trimmingCharacters(in: .whitespacesAndNewlines) == "" {
@@ -152,7 +152,7 @@ public func fileInput(name: String = "", message: String? = nil, successMessage:
         do {
             let filePath: String = input(name: toPrint, type: "string").trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\\", with: "")
             filePass = try tryAction(filePath)
-            if successMessage {
+            if successMessage && filePass {
                 print("Successfully imported from \(name).")
             }
         } catch let error {

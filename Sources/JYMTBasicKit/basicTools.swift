@@ -26,8 +26,7 @@ public func input(name: String, type: String, defaultValue: Any? = nil, intRange
         let response = readLine()
         var inputConverted: Any?
         guard let r: String = response else {
-            print("Error: got nil response.")
-            continue
+            fatalError("Fatal Error: got nil response. Program exited.")
         }
         
         if defaultValue != nil && r.trimmingCharacters(in: .whitespacesAndNewlines) == "" {

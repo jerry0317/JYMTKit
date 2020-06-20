@@ -216,3 +216,14 @@ public extension Array where Element == Double {
         "[" + srounded(digitsAfterDecimal: digitsAfterDecimal, option: option).joined(separator: ", ") + "]"
     }
 }
+
+/**
+ Create String in CSV format by giving the header and the array of dictionaries as data.
+ */
+func createCSVString(header: [String], data: [Dictionary<String, AnyObject>], nilString: String = "N/A") -> String {
+    var csvStr = header.joined(separator: ",") + "\n"
+    for dict in data {
+        csvStr += header.map({String(describing: dict[$0] ?? nilString as AnyObject)}).joined(separator: ",") + "\n"
+    }
+    return csvStr
+}

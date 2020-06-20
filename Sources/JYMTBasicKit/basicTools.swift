@@ -176,6 +176,17 @@ public func printWelcomeBanner(_ name: String) {
     #endif
 }
 
+/**
+ Create String in CSV format by giving the header and the array of dictionaries as data.
+ */
+public func createCSVString(header: [String], data: [Dictionary<String, AnyObject>], nilString: String = "N/A") -> String {
+    var csvStr = header.joined(separator: ",") + "\n"
+    for dict in data {
+        csvStr += header.map({String(describing: dict[$0] ?? nilString as AnyObject)}).joined(separator: ",") + "\n"
+    }
+    return csvStr
+}
+
 public extension String {
     /**
      Returns a string with self appended by the unix time.
@@ -215,15 +226,4 @@ public extension Array where Element == Double {
     func sroundedString(digitsAfterDecimal: Int, option: String = "f") -> String {
         "[" + srounded(digitsAfterDecimal: digitsAfterDecimal, option: option).joined(separator: ", ") + "]"
     }
-}
-
-/**
- Create String in CSV format by giving the header and the array of dictionaries as data.
- */
-func createCSVString(header: [String], data: [Dictionary<String, AnyObject>], nilString: String = "N/A") -> String {
-    var csvStr = header.joined(separator: ",") + "\n"
-    for dict in data {
-        csvStr += header.map({String(describing: dict[$0] ?? nilString as AnyObject)}).joined(separator: ",") + "\n"
-    }
-    return csvStr
 }

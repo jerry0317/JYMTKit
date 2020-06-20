@@ -266,12 +266,15 @@ public struct TextFile: File {
     }
     
     /**
-     Safely export the log file to URL. Print the error when the error raises.
+     Safely export the log file to URL. Print the error when the error raises (error will be printed regardless of the `print` parameter.
     */
-    public func safelyExport(toFile path: URL) {
+    public func safelyExport(toFile path: URL, affix: String = "txt", print: Bool = true) {
         do {
             try save(asURL: path)
-            Swift.print("Results have been saved to txt file.")
+            if print {
+                Swift.print("Results have been saved to \(affix) file.")
+            }
+            
         } catch let error {
             Swift.print("Failed to save the results. An error occured: \(error).")
             Swift.print("Note: You may save the console log for further reference of the results.")

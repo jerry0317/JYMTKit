@@ -52,7 +52,7 @@ A packed input module for importing all `.xyz` files in one directory.
 
 - Returns: a tuple `([XYZFile], [String])` where the first element is the imported XYZ files and the second element is the last component names of the `.xyz` files.
 */
-func xyzFilesInput() -> ([XYZFile], [String]) {
+public func xyzFilesInput() -> ([XYZFile], [String]) {
     var xyzFiles = [XYZFile]()
     var fileNames = [String]()
     let fileManager = FileManager.default

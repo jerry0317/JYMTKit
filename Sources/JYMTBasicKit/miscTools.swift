@@ -121,11 +121,11 @@ public func sabcFileInput() -> (SABCFile, String) {
  - Returns: a tuple `(Bool, URL)` where the first element whether the user decided to save results or not, and the second element is the `URL` of the user-selected exporting path.
     - The second element is meaningless if the first element returns `false`.
  */
-public func exportingPathInput(_ name: String = "") -> (Bool, URL) {
+public func exportingPathInput(_ name: String = "", isOptional: Bool = true) -> (Bool, URL) {
     var saveResults = true
     var writePath = URL(fileURLWithPath: "")
-    fileInput(message: "\(name) exporting Path (leave empty if not to save)", successMessage: false) { (writePathInput) in
-        if writePathInput.isEmpty {
+    fileInput(message: "\(name) exporting Path\(isOptional ? " (leave empty if not to save)" : "")", successMessage: false) { (writePathInput) in
+        if writePathInput.isEmpty && isOptional {
             saveResults = false
             print("The results will not be saved.")
             return true

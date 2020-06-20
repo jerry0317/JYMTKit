@@ -48,6 +48,50 @@ public func xyzFileInput() -> (XYZFile, String) {
 }
 
 /**
+A packed input module for importing all `.xyz` files in one directory.
+
+- Returns: a tuple `([XYZFile], [String])` where the first element is the imported XYZ files and the second element is the last component names of the `.xyz` files.
+*/
+func xyzFilesInput() -> ([XYZFile], [String]) {
+    var xyzFiles = [XYZFile]()
+    var fileNames = [String]()
+    let fileManager = FileManager.default
+    fileInput(name: "XYZ files", message: "the directory path for XYZ files", tryAction: { (filePath) in
+        let xyzDirectoryUrl = URL(fileURLWithPath: filePath)
+        guard xyzDirectoryUrl.hasDirectoryPath else {
+            print("Not a valid directory. Please try again.")
+            return false
+        }
+        
+        var xyzUrls = [URL]()
+        do {
+            let fileUrls = try fileManager.contentsOfDirectory(at: xyzDirectoryUrl, includingPropertiesForKeys: nil)
+            xyzUrls = fileUrls.filter({$0.pathExtension == "xyz"})
+        } catch {
+            print("Error in reading files in the directory")
+            return false
+        }
+        
+        for xyzUrl in xyzUrls {
+            let xyzSet = try XYZFile(fromURL: xyzUrl)
+            guard xyzSet.atoms != nil && !xyzSet.atoms!.isEmpty else {
+                continue
+            }
+            xyzFiles.append(xyzSet)
+            fileNames.append(xyzUrl.lastPathComponentName)
+        }
+        
+        guard !xyzFiles.isEmpty else {
+            print("Can't find any valid xyz files in the directory. Can not proceed.")
+            return false
+        }
+        print("Found \(xyzFiles.count) valid xyz files.")
+        return true
+    })
+    return (xyzFiles, fileNames)
+}
+
+/**
  A packed input module for importing `sabc`file.
  
  - Returns: a tuple `(SABCFile, String)` where the first element is the imported SABC file and the second element is the last component name of the `sabc` file.

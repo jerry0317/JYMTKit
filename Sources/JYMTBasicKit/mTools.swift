@@ -346,7 +346,8 @@ public final class ChemBondType {
      Tells if a bond type is valid w/ memoized dynamic programming implmented.
      */
     public func validateDynProgrammed(cache: inout GlobalCache) -> Bool {
-        return findBdCodeDynProgrammed(cache: &cache) != nil && !ChemBondType.disabledBondCodes.contains(bdCode!)
+        let bd = findBdCodeDynProgrammed(cache: &cache)
+        return bd != nil && !ChemBondType.disabledBondCodes.contains(bd!)
     }
     
     /**

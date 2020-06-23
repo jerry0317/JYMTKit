@@ -282,8 +282,20 @@ public final class ChemBondType {
      The bond code for the bond. For example, the single carbon-carbon bond is denoted as .CC1.
      */
     public var bdCode: BondCode? {
-        return findBdCodeDynProgrammed(cache: &globalCache)
+        get {
+            if _storedBdCode == nil && !_bdCodeIsInvalid {
+                let newBdCode = findBdCodeDynProgrammed(cache: &globalCache)
+                _storedBdCode = newBdCode
+            }
+            return _storedBdCode
+        }
+        set {
+            _storedBdCode = newValue
+        }
     }
+    
+    private var _storedBdCode: BondCode? = nil
+    private var _bdCodeIsInvalid: Bool = false
     
     /**
      The bond length of this bond type.
@@ -357,8 +369,10 @@ public final class ChemBondType {
         guard let bdCodeInCache = cache.bdCodes[self] else {
             let newBdCode = findBdCode()
             cache.bdCodes[self] = newBdCode
+            self._bdCodeIsInvalid = true
             return newBdCode
         }
+        self._storedBdCode = bdCodeInCache
         return bdCodeInCache
     }
     

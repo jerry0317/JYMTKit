@@ -344,14 +344,25 @@ public final class ChemBondType {
      The validity of a bond type.
      */
     public var isValid: Bool {
-        validate()
+        get {
+            if _storedIsValid == nil {
+                _storedIsValid = validate()
+            }
+            return _storedIsValid!
+        }
+        set {
+            _storedIsValid = newValue
+        }
     }
     
+    private var _storedIsValid: Bool?
     /**
      Tells if a bond type is valid.
      */
     public func validate() -> Bool{
-        return bdCode != nil && !ChemBondType.disabledBondCodes.contains(bdCode!)
+        let valid = bdCode != nil && !ChemBondType.disabledBondCodes.contains(bdCode!)
+        _storedIsValid = valid
+        return valid
     }
     
     /**
@@ -359,7 +370,9 @@ public final class ChemBondType {
      */
     public func validateDynProgrammed(cache: inout GlobalCache) -> Bool {
         let bd = findBdCodeDynProgrammed(cache: &cache)
-        return bd != nil && !ChemBondType.disabledBondCodes.contains(bd!)
+        let valid = bd != nil && !ChemBondType.disabledBondCodes.contains(bd!)
+        _storedIsValid = valid
+        return valid
     }
     
     /**
@@ -369,7 +382,10 @@ public final class ChemBondType {
         guard let bdCodeInCache = cache.bdCodes[self] else {
             let newBdCode = findBdCode()
             cache.bdCodes[self] = newBdCode
-            self._bdCodeIsInvalid = true
+            self._storedBdCode = newBdCode
+            if newBdCode == nil {
+                self._bdCodeIsInvalid = true
+            }
             return newBdCode
         }
         self._storedBdCode = bdCodeInCache

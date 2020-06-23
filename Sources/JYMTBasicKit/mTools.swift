@@ -1258,7 +1258,8 @@ public func minimumBondLength(_ element1: ChemElement, _ element2: ChemElement) 
 public func minimumBondLengthDynProgrammed(_ element1: ChemElement, _ element2: ChemElement, cache: inout GlobalCache) -> Double {
     let elements = [element1, element2]
     guard let len = cache.minimumBondLength[elements] else {
-        let newLen = minimumBondLength(element1, element2)
+        let possibleBTs = possibleBondTypesDynProgrammed(element1, element2, cache: &cache)
+        let newLen = possibleBTs.map({ $0.lengthRangeTuple?.0 ?? 0.0}).min() ?? 0
         cache.minimumBondLength[elements] = newLen
         return newLen
     }

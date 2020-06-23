@@ -66,6 +66,16 @@ public struct GlobalCache {
      - It's keyed by a set of atom and the origin atom. If there's a neighbor, it will record  `(true, neighbor)`. If there're no neighbors, it will record `(false, self)`.
      */
     public var atomNeighbors: [AtomNeighborTuple: (Bool, Atom)] = [:]
+    
+    public init() {
+        
+    }
+}
+
+extension GlobalCache {
+    public mutating func clearAll() {
+        self = GlobalCache()
+    }
 }
 
 public struct CombTuple {

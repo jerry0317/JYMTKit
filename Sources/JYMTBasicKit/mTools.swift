@@ -343,6 +343,13 @@ public final class ChemBondType {
     }
     
     /**
+     Tells if a bond type is valid w/ memoized dynamic programming implmented.
+     */
+    public func validateDynProgrammed(cache: inout GlobalCache) -> Bool {
+        return findBdCodeDynProgrammed(cache: &cache) != nil && !ChemBondType.disabledBondCodes.contains(bdCode!)
+    }
+    
+    /**
      Use cache to implement the memoized dynamic programming to find the bond code of the type.
      */
     public func findBdCodeDynProgrammed(cache: inout GlobalCache) -> BondCode? {
@@ -1223,7 +1230,14 @@ public func possibleBondTypesDynProgrammed(_ atomName1: ChemElement?, _ atomName
     var bondTypes = cache.possibleBondTypes[[element1, element2]]
     
     if bondTypes == nil {
-        bondTypes = possibleBondTypes(element1, element2)
+        var possibleBondTypeList: [ChemBondType] = []
+        for order in 1...4 {
+            let bond = ChemBondType(element1, element2, order)
+            if bond.validateDynProgrammed(cache: &cache) {
+                possibleBondTypeList.append(bond)
+            }
+        }
+        bondTypes = possibleBondTypeList
         cache.possibleBondTypes[btTuple] = bondTypes!
     }
     

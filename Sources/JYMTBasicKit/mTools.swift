@@ -108,13 +108,13 @@ public final class Atom {
      Possible atoms after re-signing it.
      */
     public var possibles: [Atom] {
-        return findPossiblesDynProgrammed()
+        return findPossiblesDynProgrammed(cache: &globalCache)
     }
     
     /**
      Find the eight possible atom (differ in rvec) after re-signing.
      */
-    private func findPossibles() -> [Atom] {
+    public func findPossibles() -> [Atom] {
         if rvec == nil {
             return []
         } else {
@@ -126,12 +126,12 @@ public final class Atom {
     /**
      Use cache to implement memoized dynamic programming to find possibles.
      */
-    private func findPossiblesDynProgrammed() -> [Atom] {
-        if globalCache.atomPossibles[self] != nil {
-            return globalCache.atomPossibles[self]!
+    public func findPossiblesDynProgrammed(cache: inout GlobalCache) -> [Atom] {
+        if cache.atomPossibles[self] != nil {
+            return cache.atomPossibles[self]!
         } else {
             let possibles = findPossibles()
-            globalCache.atomPossibles[self] = possibles
+            cache.atomPossibles[self] = possibles
             return possibles
         }
     }
@@ -282,7 +282,7 @@ public final class ChemBondType {
      The bond code for the bond. For example, the single carbon-carbon bond is denoted as .CC1.
      */
     public var bdCode: BondCode? {
-        return findBdCodeDynProgrammed()
+        return findBdCodeDynProgrammed(cache: &globalCache)
     }
     
     /**
@@ -345,10 +345,10 @@ public final class ChemBondType {
     /**
      Use cache to implement the memoized dynamic programming to find the bond code of the type.
      */
-    public func findBdCodeDynProgrammed() -> BondCode? {
-        guard let bdCodeInCache = globalCache.bdCodes[self] else {
+    public func findBdCodeDynProgrammed(cache: inout GlobalCache) -> BondCode? {
+        guard let bdCodeInCache = cache.bdCodes[self] else {
             let newBdCode = findBdCode()
-            globalCache.bdCodes[self] = newBdCode
+            cache.bdCodes[self] = newBdCode
             return newBdCode
         }
         return bdCodeInCache
@@ -473,16 +473,16 @@ public final class ChemBond {
     /**
      A memoized implementation of dynamic programming for the original algorithm `findNeighbor`.
      */
-    public func findNeighborDynProgammed(_ atom: Atom) -> Atom? {
+    public func findNeighborDynProgammed(_ atom: Atom, cache: inout GlobalCache) -> Atom? {
         let nbTuple = AtomNeighborTuple(atoms, atom)
-        let neighborInCache = globalCache.atomNeighbors[nbTuple]
+        let neighborInCache = cache.atomNeighbors[nbTuple]
         
         if neighborInCache == nil {
             let newNeighbor = findNeighbor(atom)
             if newNeighbor == nil {
-                globalCache.atomNeighbors[nbTuple] = (false, atom)
+                cache.atomNeighbors[nbTuple] = (false, atom)
             } else {
-                globalCache.atomNeighbors[nbTuple] = (true, newNeighbor!)
+                cache.atomNeighbors[nbTuple] = (true, newNeighbor!)
             }
             return newNeighbor
         } else {
@@ -769,7 +769,7 @@ public struct VSEPRGraph: SubChemBondGraph {
     }
     
     // Not available for use yet
-    private func completelySymmetricFilter(tolRatio: Double = 0.1) -> Bool {
+    private func completelySymmetricFilter(tolRatio: Double = 0.1, cache: inout GlobalCache) -> Bool {
         guard completelySymmetric else {
             return true
         }
@@ -778,7 +778,7 @@ public struct VSEPRGraph: SubChemBondGraph {
             return true
         }
         
-        let angles = bondAnglesInDeg(center: center, attached: attached).map { $0.0 }
+        let angles = bondAnglesInDegDynProgrammed(center: center, attached: attached, cache: &cache).map { $0.0 }
         let nonNilAngles = angles.compactMap({ $0 })
         if nonNilAngles.count < angles.count {
             return false
@@ -830,12 +830,12 @@ public struct VSEPRGraph: SubChemBondGraph {
     /**
      A filter to determine if this VSEPR graph is valid.
      */
-    public func filter(filters: Set<StrcFilter> = [.bondAngle, .coplanarity, .valence], tolRatio: Double = 0.1, csTolRatio: Double? = nil, copTolRange: Double = 0.01) -> Bool {
-        let sts = filterSTS(filters: filters, tolRatio: tolRatio, csTolRatio: csTolRatio, copTolRange: copTolRange)
+    public func filter(filters: Set<StrcFilter> = [.bondAngle, .coplanarity, .valence], tolRatio: Double = 0.1, csTolRatio: Double? = nil, copTolRange: Double = 0.01, cache: inout GlobalCache) -> Bool {
+        let sts = filterSTS(filters: filters, tolRatio: tolRatio, csTolRatio: csTolRatio, copTolRange: copTolRange, cache: &cache)
         return !sts.map({ $1.isValid }).contains(false)
     }
     
-    public func filterSTS(filters: Set<StrcFilter> = [.bondAngle, .coplanarity, .valence], tolRatio: Double = 0.1, csTolRatio: Double? = nil, copTolRange: Double = 0.01) -> [StrcDevTuple] {
+    public func filterSTS(filters: Set<StrcFilter> = [.bondAngle, .coplanarity, .valence], tolRatio: Double = 0.1, csTolRatio: Double? = nil, copTolRange: Double = 0.01, cache: inout GlobalCache) -> [StrcDevTuple] {
         var rList = [StrcDevTuple]()
         
 //        Valence Filter
@@ -874,7 +874,7 @@ public struct VSEPRGraph: SubChemBondGraph {
             
 //            Bond Angle Filter
             if filters.contains(.bondAngle) {
-                let baDev = bondAnglesFilterSTS(center: center, attached: attached, range: range, tolRatio: tolRatio)
+                let baDev = bondAnglesFilterSTS(center: center, attached: attached, range: range, tolRatio: tolRatio, cache: &cache)
                 rList.append((.bondAngle, baDev))
             }
             
@@ -1215,16 +1215,16 @@ public func possibleBondTypes(_ atomName1: ChemElement, _ atomName2: ChemElement
 /**
  Use cache to implement the memoized dynamic programming for determination of possible bond types between two atoms.
  */
-public func possibleBondTypesDynProgrammed(_ atomName1: ChemElement?, _ atomName2: ChemElement?) -> [ChemBondType] {
+public func possibleBondTypesDynProgrammed(_ atomName1: ChemElement?, _ atomName2: ChemElement?, cache: inout GlobalCache) -> [ChemBondType] {
     guard let element1 = atomName1, let element2 = atomName2 else {
         return []
     }
     let btTuple = [element1, element2]
-    var bondTypes = globalCache.possibleBondTypes[[element1, element2]]
+    var bondTypes = cache.possibleBondTypes[[element1, element2]]
     
     if bondTypes == nil {
         bondTypes = possibleBondTypes(element1, element2)
-        globalCache.possibleBondTypes[btTuple] = bondTypes!
+        cache.possibleBondTypes[btTuple] = bondTypes!
     }
     
     return bondTypes!
@@ -1241,11 +1241,11 @@ public func minimumBondLength(_ element1: ChemElement, _ element2: ChemElement) 
 /**
  Use cache to implement the memoized dynamic programming in the determination of minimum bond length between two elements.
  */
-public func minimumBondLengthDynProgrammed(_ element1: ChemElement, _ element2: ChemElement) -> Double {
+public func minimumBondLengthDynProgrammed(_ element1: ChemElement, _ element2: ChemElement, cache: inout GlobalCache) -> Double {
     let elements = [element1, element2]
-    guard let len = globalCache.minimumBondLength[elements] else {
+    guard let len = cache.minimumBondLength[elements] else {
         let newLen = minimumBondLength(element1, element2)
-        globalCache.minimumBondLength[elements] = newLen
+        cache.minimumBondLength[elements] = newLen
         return newLen
     }
     return len
@@ -1290,32 +1290,9 @@ public func bondAngle(center: Atom, bonds: [ChemBond]) -> Measurement<UnitAngle>
 }
 
 /**
- The bond angle of the two bonds of an atom. Takes the two attached atoms as parameter. Returns the angle in degree. Has an option to turn on/off of the memoized dynamic programming (off by default).
+ The bond angle of the two bonds of an atom. Takes the two attached atoms as parameter. Returns the angle in degree.
  */
-public func bondAngleInDeg(center: Atom, attached: [Atom], dynProgammed: Bool = false) -> Double? {
-    if dynProgammed {
-        guard let baTuple = BondAngleTuple(center, attached: attached) else {
-            return nil
-        }
-        guard let theta = globalCache.bondAngles[baTuple] else {
-            guard let newTheta = bondAngleInDegOriginal(center: center, attached: attached) else {
-                return nil
-            }
-            
-            globalCache.bondAngles[baTuple] = newTheta
-            return newTheta
-        }
-        return theta
-    } else {
-        return bondAngleInDegOriginal(center: center, attached: attached)
-    }
-    
-}
-
-/**
- The original implementation of `bondAngleInDeg`.
- */
-public func bondAngleInDegOriginal(center: Atom, attached: [Atom]) -> Double? {
+public func bondAngleInDeg(center: Atom, attached: [Atom]) -> Double? {
     let attachedRVecs = attached.compactMap { $0.rvec }
     guard center.rvec != nil && attachedRVecs.count == 2 else {
         return nil
@@ -1324,6 +1301,24 @@ public func bondAngleInDegOriginal(center: Atom, attached: [Atom]) -> Double? {
     let dVec2 = center.rvec! - attachedRVecs[1]
     
     return dVec1.angleInDeg(to: dVec2)
+}
+
+/**
+ The bond angle of the two bonds of an atom. Takes the two attached atoms as parameter. Returns the angle in degree. Cache to implement the memoized dynamic programming is used.
+ */
+public func bondAngleInDegDynProgrammed(center: Atom, attached: [Atom], cache: inout GlobalCache) -> Double? {
+    guard let baTuple = BondAngleTuple(center, attached: attached) else {
+        return nil
+    }
+    guard let theta = cache.bondAngles[baTuple] else {
+        guard let newTheta = bondAngleInDeg(center: center, attached: attached) else {
+            return nil
+        }
+        
+        cache.bondAngles[baTuple] = newTheta
+        return newTheta
+    }
+    return theta
 }
 
 /**
@@ -1340,7 +1335,7 @@ public func bondAngleInDeg(center: Atom, bonds: [ChemBond]) -> Double? {
  The bond angle of any number of bonds of an atom. Returns tuple of angle and the set of the adjacent atoms involved in the two bonds of the bond angle.
  */
 public func bondAngles(center: Atom, attached: [Atom]) -> [(Measurement<UnitAngle>?, Set<Atom>)] {
-    let attachedAtomsList = combinationsDynProgrammed(attached, 2)
+    let attachedAtomsList = combinationsDynProgrammed(attached, 2, cache: &globalCache)
     return attachedAtomsList.map { (bondAngle(center: center, attached: Array($0)), $0) }
 }
 
@@ -1348,7 +1343,7 @@ public func bondAngles(center: Atom, attached: [Atom]) -> [(Measurement<UnitAngl
  The bond angle of any number of bonds of an atom. Returns tuple of angle and the set of the adjacent atoms involved in the two bonds of the bond angle.
  */
 public func bondAngles(center: Atom, bonds: [ChemBond]) -> [(Measurement<UnitAngle>?, Set<ChemBond>)] {
-    let attachedAtomsList = combinationsDynProgrammed(bonds, 2)
+    let attachedAtomsList = combinationsDynProgrammed(bonds, 2, cache: &globalCache)
     return attachedAtomsList.map { (bondAngle(center: center, bonds: Array($0)), $0) }
 }
 
@@ -1370,7 +1365,7 @@ public func bondAngle(center: Atom, bonds: [ChemBond], unit: UnitAngle) -> Doubl
  The bond angle of any number of bonds of an atom. Returns tuple of the value of the angle given provided unit and the set of the adjacent atoms involved in the two bonds of the bond angle.
  */
 public func bondAngles(center: Atom, attached: [Atom], unit: UnitAngle) -> [(Double?, Set<Atom>)] {
-    let attachedAtomsList = combinationsDynProgrammed(attached, 2)
+    let attachedAtomsList = combinationsDynProgrammed(attached, 2, cache: &globalCache)
     return attachedAtomsList.map { (bondAngle(center: center, attached: Array($0), unit: unit), $0) }
 }
 
@@ -1378,22 +1373,22 @@ public func bondAngles(center: Atom, attached: [Atom], unit: UnitAngle) -> [(Dou
  The bond angle of any number of bonds of an atom. Returns tuple of the value of the angle given provided unit and the set of the two bonds of the bond angle.
  */
 public func bondAngles(center: Atom, bonds: [ChemBond], unit: UnitAngle) -> [(Double?, Set<ChemBond>)] {
-    let attachedAtomsList = combinationsDynProgrammed(bonds, 2)
+    let attachedAtomsList = combinationsDynProgrammed(bonds, 2, cache: &globalCache)
     return attachedAtomsList.map { (bondAngle(center: center, bonds: Array($0), unit: unit), $0) }
 }
 /**
  The bond angle of any number of bonds of an atom. Returns tuple of the value of the angle in degrees and the set of the adjacent atoms involved in the two bonds of the bond angle.
  */
-public func bondAnglesInDeg(center: Atom, attached: [Atom]) -> [(Double?, Set<Atom>)] {
-    let attachedAtomsList = combinationsDynProgrammed(attached, 2)
+public func bondAnglesInDegDynProgrammed(center: Atom, attached: [Atom], cache: inout GlobalCache) -> [(Double?, Set<Atom>)] {
+    let attachedAtomsList = combinationsDynProgrammed(attached, 2, cache: &cache)
     return attachedAtomsList.map { (bondAngleInDeg(center: center, attached: Array($0)), $0) }
 }
 
 /**
  The bond angle of any number of bonds of an atom. Returns tuple of the value of the angle in degrees and the set of the two bonds of the bond angle.
  */
-public func bondAnglesInDeg(center: Atom, bonds: [ChemBond]) -> [(Double?, Set<ChemBond>)] {
-    let attachedAtomsList = combinationsDynProgrammed(bonds, 2)
+public func bondAnglesInDegDynProgrammed(center: Atom, bonds: [ChemBond], cache: inout GlobalCache) -> [(Double?, Set<ChemBond>)] {
+    let attachedAtomsList = combinationsDynProgrammed(bonds, 2, cache: &cache)
     return attachedAtomsList.map { (bondAngleInDeg(center: center, bonds: Array($0)), $0) }
 }
 
@@ -1501,17 +1496,17 @@ public func bondAnglesFilterSTS(_ angles: [Double?], range: ClosedRange<Double>,
 /**
  Filtering by bond angle with a given range. Takes the center atom and attached bonds as parameters.
  */
-public func bondAnglesFilter(center aAtom: Atom, bonds: [ChemBond], range: ClosedRange<Double>, tolRatio: Double = 0.1) -> Bool {
-    return bondAnglesFilterSTS(center: aAtom, bonds: bonds, range: range, tolRatio: tolRatio).isValid
+public func bondAnglesFilter(center aAtom: Atom, bonds: [ChemBond], range: ClosedRange<Double>, tolRatio: Double = 0.1, cache: inout GlobalCache) -> Bool {
+    return bondAnglesFilterSTS(center: aAtom, bonds: bonds, range: range, tolRatio: tolRatio, cache: &cache).isValid
 }
 
-public func bondAnglesFilterSTS(center aAtom: Atom, bonds: [ChemBond], range: ClosedRange<Double>, tolRatio: Double = 0.1) -> StrcDeviation {
+public func bondAnglesFilterSTS(center aAtom: Atom, bonds: [ChemBond], range: ClosedRange<Double>, tolRatio: Double = 0.1, cache: inout GlobalCache) -> StrcDeviation {
     var thetaList = [Double?]()
     switch bonds.count {
     case 2:
         thetaList = [bondAngleInDeg(center: aAtom, bonds: bonds)]
     case 3...:
-        thetaList = bondAnglesInDeg(center: aAtom, bonds: bonds).map { $0.0 }
+        thetaList = bondAnglesInDegDynProgrammed(center: aAtom, bonds: bonds, cache: &cache).map { $0.0 }
     case 0...:
         return StrcDeviation.success
     default:
@@ -1524,17 +1519,17 @@ public func bondAnglesFilterSTS(center aAtom: Atom, bonds: [ChemBond], range: Cl
 /**
  Filtering by bond angle with a given range. Takes the center atom and attached atoms as parameters.
  */
-public func bondAnglesFilter(center aAtom: Atom, attached: [Atom], range: ClosedRange<Double>, tolRatio: Double = 0.1) -> Bool {
-    return bondAnglesFilterSTS(center: aAtom, attached: attached, range: range, tolRatio: tolRatio).isValid
+public func bondAnglesFilter(center aAtom: Atom, attached: [Atom], range: ClosedRange<Double>, tolRatio: Double = 0.1, cache: inout GlobalCache) -> Bool {
+    return bondAnglesFilterSTS(center: aAtom, attached: attached, range: range, tolRatio: tolRatio, cache: &cache).isValid
 }
 
-public func bondAnglesFilterSTS(center aAtom: Atom, attached: [Atom], range: ClosedRange<Double>, tolRatio: Double = 0.1) -> StrcDeviation {
+public func bondAnglesFilterSTS(center aAtom: Atom, attached: [Atom], range: ClosedRange<Double>, tolRatio: Double = 0.1, cache: inout GlobalCache) -> StrcDeviation {
     var thetaList = [Double?]()
     switch attached.count {
     case 2:
         thetaList = [bondAngleInDeg(center: aAtom, attached: attached)]
     case 3...:
-        thetaList = bondAnglesInDeg(center: aAtom, attached: attached).map { $0.0 }
+        thetaList = bondAnglesInDegDynProgrammed(center: aAtom, attached: attached, cache: &cache).map { $0.0 }
     case 0...:
         return StrcDeviation.success
     default:
@@ -1547,16 +1542,16 @@ public func bondAnglesFilterSTS(center aAtom: Atom, attached: [Atom], range: Clo
 /**
  A filter to filter out the atoms that are too close to the target atom.
  */
-public func minimumBondLengthFilter(_ atom1: Atom, _ atom2: Atom, tolRange: Double = 0.01) -> Bool {
-    return minimumBondLengthFilterSTS(atom1, atom2, tolRange: tolRange).isValid
+public func minimumBondLengthFilter(_ atom1: Atom, _ atom2: Atom, tolRange: Double = 0.01, cache: inout GlobalCache) -> Bool {
+    return minimumBondLengthFilterSTS(atom1, atom2, tolRange: tolRange, cache: &cache).isValid
 }
 
-public func minimumBondLengthFilterSTS(_ atom1: Atom, _ atom2: Atom, tolRange: Double = 0.01) -> StrcDeviation {
+public func minimumBondLengthFilterSTS(_ atom1: Atom, _ atom2: Atom, tolRange: Double = 0.01, cache: inout GlobalCache) -> StrcDeviation {
     guard let element1 = atom1.element, let element2 = atom2.element else {
         return StrcDeviation.failure
     }
     let atomd = atomDistance(atom1, atom2) ?? 0.0
-    let minimumd = minimumBondLengthDynProgrammed(element1, element2)
+    let minimumd = minimumBondLengthDynProgrammed(element1, element2, cache: &cache)
     let dev = (minimumd - atomd) / tolRange
     return StrcDeviation(dev < 1, dev)
 }
@@ -1625,7 +1620,8 @@ public func strcMoleculeConstructor(
     filters: Set<StrcFilter> = [.minimumBondLength, .bondTypeLength, .bondAngle, .coplanarity, .valence],
     tolRange: Double = 0.1,
     tolRatio: Double = 0.1,
-    distanceRange: ClosedRange<Double>? = nil
+    distanceRange: ClosedRange<Double>? = nil,
+    cache: inout GlobalCache
 ) -> StrcMolecule {
     var mol = stMol
     let bondGraphs = mol.bondGraphs
@@ -1637,7 +1633,7 @@ public func strcMoleculeConstructor(
 
         // Step 1: Make sure the new atom is not too close to any of the existing atoms.
         if filters.contains(.minimumBondLength) {
-            let minimumBDLCheck = stMol.atoms.filter({ !minimumBondLengthFilter(atom, $0, tolRange: tolRange) }).isEmpty
+            let minimumBDLCheck = stMol.atoms.filter({ !minimumBondLengthFilter(atom, $0, tolRange: tolRange, cache: &cache) }).isEmpty
             if !minimumBDLCheck {
                 return mol
             }
@@ -1650,7 +1646,7 @@ public func strcMoleculeConstructor(
         if filters.contains(.bondTypeLength) {
             // Step 2.1: Find possible new bond connections of each existing atom.
             for vAtom in stMol.atoms {
-                let possibleBts = possibleBondTypesDynProgrammed(vAtom.element, atom.element)
+                let possibleBts = possibleBondTypesDynProgrammed(vAtom.element, atom.element, cache: &cache)
                 var possibleBonds = [ChemBond]()
                 for bondType in possibleBts {
                     if !bondTypeLengthFilter(vAtom, atom, bondType, tolRange) {
@@ -1695,7 +1691,7 @@ public func strcMoleculeConstructor(
                         pBondGraph.bonds.formUnion(pBonds)
                         for bAtom in mol.atoms {
                             let vseprGraph = pBondGraph.findVseprGraph(bAtom)
-                            if !vseprGraph.filter(filters: filters, tolRatio: tolRatio, copTolRange: tolRange) {
+                            if !vseprGraph.filter(filters: filters, tolRatio: tolRatio, copTolRange: tolRange, cache: &cache) {
                                 continue outer
                             }
                         }
@@ -1717,7 +1713,8 @@ public func strcMoleculeConstructorSTS(
     tolRange: Double,
     tolRatio: Double = 0.1,
     baseScore: Double = 100,
-    distanceRange: ClosedRange<Double>? = nil
+    distanceRange: ClosedRange<Double>? = nil,
+    cache: inout GlobalCache
 ) -> StrcMolecule {
     var mol = stMol
     let bondGraphs = mol.bondGraphs
@@ -1734,7 +1731,7 @@ public func strcMoleculeConstructorSTS(
         // Step 1: Make sure the new atom is not too close to any of the existing atoms.
         if filters.contains(.minimumBondLength) {
             for sAtom in stMol.atoms {
-                let mStDev = minimumBondLengthFilterSTS(atom, sAtom, tolRange: tolRange)
+                let mStDev = minimumBondLengthFilterSTS(atom, sAtom, tolRange: tolRange, cache: &cache)
                 mol.score!.append(dev: mStDev, filter: .minimumBondLength)
                 if !mol.isValid {
                     return mol
@@ -1747,7 +1744,7 @@ public func strcMoleculeConstructorSTS(
         if filters.contains(.bondTypeLength) {
             // Step 2.1: Find possible new bond connections of each existing atom.
             for vAtom in stMol.atoms {
-                let possibleBts = possibleBondTypesDynProgrammed(vAtom.element, atom.element)
+                let possibleBts = possibleBondTypesDynProgrammed(vAtom.element, atom.element, cache: &cache)
                 var possibleBonds = [(ChemBond, StrcDeviation)]()
                 for bondType in possibleBts {
                     let bStDev = bondTypeLengthFilterSTS(vAtom, atom, bondType, tolRange)
@@ -1816,7 +1813,7 @@ public func strcMoleculeConstructorSTS(
                         pBondGraph.bonds.formUnion(pBonds)
                         for bAtom in mol.atoms {
                             let vseprGraph = pBondGraph.findVseprGraph(bAtom)
-                            let vStDevs = vseprGraph.filterSTS(filters: filters, tolRatio: tolRatio, copTolRange: tolRange)
+                            let vStDevs = vseprGraph.filterSTS(filters: filters, tolRatio: tolRatio, copTolRange: tolRange, cache: &cache)
                             pBondGraph.score!.append(contentsOf: vStDevs)
                             if !pBondGraph.isValid {
                                 continue outer
@@ -1842,14 +1839,15 @@ public func rcsConstructor(
     tolRange: Double = 0.1,
     tolRatio: Double = 0.1,
     distanceRange: ClosedRange<Double>? = nil,
-    testMode: Bool = false
+    testMode: Bool = false,
+    cache: inout GlobalCache
 ) -> [StrcMolecule] {
-    let possibleAtoms = testMode ? [atom] : atom.possibles
+    let possibleAtoms = testMode ? [atom] : atom.findPossiblesDynProgrammed(cache: &cache)
     var possibleSMList: [StrcMolecule] = []
     
     for pAtom in possibleAtoms {
         // To be STS-ize
-        let sMol = strcMoleculeConstructorSTS(stMol: stMol, atom: pAtom, filters: filters, tolRange: tolRange, tolRatio: tolRatio, distanceRange: distanceRange)
+        let sMol = strcMoleculeConstructorSTS(stMol: stMol, atom: pAtom, filters: filters, tolRange: tolRange, tolRatio: tolRatio, distanceRange: distanceRange, cache: &cache)
         
         if !filters.intersection([.bondAngle, .coplanarity, .valence]).isEmpty {
             if !sMol.bondGraphs.isEmpty {
@@ -1899,7 +1897,7 @@ public func rcsAction(rAtoms: [Atom], stMolList mList: [StrcMolecule], tolRange:
                 } else {
                     globalCache.rcsConstructorCache.insert(rcsTuple)
                 }
-                let newMList = rcsConstructor(atom: rAtom, stMol: stMol, tolRange: tolRange, tolRatio: tolRatio)
+                let newMList = rcsConstructor(atom: rAtom, stMol: stMol, tolRange: tolRange, tolRatio: tolRatio, cache: &globalCache)
                 if !newMList.isEmpty {
                     let newRAtoms = rAtoms.filter({$0 != rAtom})
                     rcsAction(rAtoms: newRAtoms, stMolList: newMList, tolRange: tolRange, tolRatio: tolRatio, possibleList: &pList, trueMol: trueMol)
@@ -1920,7 +1918,8 @@ public func rcsActionDynProgrammed(
     tolRatio: Double = 0.1,
     trueMol: StrcMolecule? = nil,
     distanceRange: ClosedRange<Double>? = nil,
-    testMode: Bool = false
+    testMode: Bool = false,
+    cache: inout GlobalCache
 ) -> [StrcMolecule] {
     guard !rAtoms.isEmpty else {
         return []
@@ -1965,7 +1964,7 @@ public func rcsActionDynProgrammed(
             for stMol in stMols {
                 let rList = rAtoms.filter { !stMol.containsById($0) }
                 for rAtom in rList {
-                    let newMList = rcsConstructor(atom: rAtom, stMol: stMol, filters: filters, tolRange: tolRange, tolRatio: tolRatio, distanceRange: distanceRange, testMode: testMode)
+                    let newMList = rcsConstructor(atom: rAtom, stMol: stMol, filters: filters, tolRange: tolRange, tolRatio: tolRatio, distanceRange: distanceRange, testMode: testMode, cache: &cache)
                     
                     for newStMol in newMList {
                         if globalCache.stMolMatched.0.contains(newStMol.atoms) {

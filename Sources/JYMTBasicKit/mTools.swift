@@ -1997,13 +1997,13 @@ public func rcsActionDynProgrammed(
                     let newMList = rcsConstructor(atom: rAtom, stMol: stMol, filters: filters, tolRange: tolRange, tolRatio: tolRatio, distanceRange: distanceRange, testMode: testMode, cache: &cache)
                     
                     for newStMol in newMList {
-                        if globalCache.stMolMatched.0.contains(newStMol.atoms) {
-                            globalCache.stMolMatched.0.remove(newStMol.atoms)
-                            globalCache.stMolMatched.1.insert(newStMol.atoms)
-                        } else if globalCache.stMolMatched.1.contains(newStMol.atoms) {
+                        if cache.stMolMatched.0.contains(newStMol.atoms) {
+                            cache.stMolMatched.0.remove(newStMol.atoms)
+                            cache.stMolMatched.1.insert(newStMol.atoms)
+                        } else if cache.stMolMatched.1.contains(newStMol.atoms) {
                             // Do nothing
                         } else {
-                            globalCache.stMolMatched.0.insert(newStMol.atoms)
+                            cache.stMolMatched.0.insert(newStMol.atoms)
                         }
                         
                         addStMolToMDynDict(j + 1, newStMol)
@@ -2018,8 +2018,8 @@ public func rcsActionDynProgrammed(
             }
         }
         
-        let dedCount = globalCache.stMolMatched.1.count
-        for (i, atoms) in globalCache.stMolMatched.1.enumerated() {
+        let dedCount = cache.stMolMatched.1.count
+        for (i, atoms) in cache.stMolMatched.1.enumerated() {
             let saList = mDynDict[j + 1]![atoms]
             let percentage = i * 100 / dedCount
             
@@ -2037,7 +2037,7 @@ public func rcsActionDynProgrammed(
         
         print(toPrintWithSpace(loopDisplayString(j + 1, j, tIJ), 79))
         
-        globalCache.stMolMatched = ([], [])
+        cache.stMolMatched = ([], [])
     }
     
     let result = mDynDict[rCount]!.flatMap({ $0.value })

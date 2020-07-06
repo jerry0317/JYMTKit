@@ -1965,6 +1965,7 @@ public func rcsActionDynProgrammed(
     trueMol: StrcMolecule? = nil,
     distanceRange: ClosedRange<Double>? = nil,
     testMode: Bool = false,
+    toPrint: Bool = true,
     cache: inout GlobalCache
 ) -> [StrcMolecule] {
     guard !rAtoms.isEmpty else {
@@ -2025,11 +2026,12 @@ public func rcsActionDynProgrammed(
                         addStMolToMDynDict(j + 1, newStMol)
                     }
                     
-                    
-                    #if DEBUG
-                    #else
-                    printStringInLine(loopDisplayString(j + 1, j, tIJ) + "Calculating (\(percentage)%)")
-                    #endif
+                    if toPrint {
+                        #if DEBUG
+                        #else
+                        printStringInLine(loopDisplayString(j + 1, j, tIJ) + "Calculating (\(percentage)%)")
+                        #endif
+                    }
                 }
             }
         }
@@ -2045,13 +2047,16 @@ public func rcsActionDynProgrammed(
             let combinedStMol: StrcMolecule = saList!.reduce(StrcMolecule(atoms), { $0.combined($1) ?? $0 })
             mDynDict[j + 1]![atoms] = [combinedStMol]
 
-            #if DEBUG
-            #else
-            printStringInLine(loopDisplayString(j + 1, j, tIJ) + "Deduplicating (\(percentage)%)")
-            #endif
+            if toPrint {
+                #if DEBUG
+                #else
+                printStringInLine(loopDisplayString(j + 1, j, tIJ) + "Deduplicating (\(percentage)%)")
+                #endif
+            }
         }
-        
-        print(toPrintWithSpace(loopDisplayString(j + 1, j, tIJ), 79))
+        if toPrint {
+            print(toPrintWithSpace(loopDisplayString(j + 1, j, tIJ), 79))
+        }
         
         cache.stMolMatched = ([], [])
     }

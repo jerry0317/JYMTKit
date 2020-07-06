@@ -56,7 +56,7 @@ public func xyzFilesInput() -> ([XYZFile], [String]) {
     var xyzFiles = [XYZFile]()
     var fileNames = [String]()
     let fileManager = FileManager.default
-    fileInput(name: "XYZ files", message: "the directory path for XYZ files", successMessage = false, tryAction: { (filePath) in
+    fileInput(name: "XYZ files", message: "the directory path for XYZ files", successMessage: false, tryAction: { (filePath) in
         let xyzDirectoryUrl = URL(fileURLWithPath: filePath)
         guard xyzDirectoryUrl.hasDirectoryPath else {
             print("Not a valid directory. Please try again.")

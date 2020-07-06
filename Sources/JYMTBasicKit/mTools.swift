@@ -1998,7 +1998,9 @@ public func rcsActionDynProgrammed(
         return "Atoms: \(toPrintWithSpace(j1 + 1, 4)) Int. possibles: \(toPrintWithSpace(mDynDict[j2 + 1]!.count, 9)) Time: \(toPrintWithSpace(timeTaken, 10)) "
     }
     
-    print(loopDisplayString(0, -1, Date()))
+    if toPrint {
+        print(loopDisplayString(0, -1, Date()))
+    }
     
     for j in 0...(rCount - 1) {
         let tIJ = Date()

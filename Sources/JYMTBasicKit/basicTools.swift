@@ -187,6 +187,17 @@ public func createCSVString(header: [String], data: [Dictionary<String, AnyObjec
     return csvStr
 }
 
+/**
+ Convert a timeinterval (Double) to a standard format string like "3h 6m 21s".
+ */
+public func timeIntervalToString(_ timeInterval: TimeInterval, allowedUnits: NSCalendar.Unit = [.day, .hour, .minute, .second], unitsStyle: DateComponentsFormatter.UnitsStyle = .abbreviated, errorString: String = "N/A", maximumUnitCount: Int = 0) -> String {
+    let formatter = DateComponentsFormatter()
+    formatter.allowedUnits = allowedUnits
+    formatter.unitsStyle = unitsStyle
+    formatter.maximumUnitCount = maximumUnitCount
+    return formatter.string(from: timeInterval) ?? errorString
+}
+
 public extension String {
     /**
      Returns a string with self appended by the unix time.

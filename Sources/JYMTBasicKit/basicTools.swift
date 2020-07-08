@@ -171,7 +171,7 @@ public func printWelcomeBanner(_ name: String) {
     let year = Calendar.current.component(.year, from: Date())
     print()
     print("JYMoleculeTool - \(name)")
-    print("Copyright © 2019 - \(year) Jerry Yan. All rights reserved.")
+    print("Copyright © 2019-\(year) Jerry Yan. All rights reserved.")
     print()
     #endif
 }

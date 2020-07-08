@@ -168,9 +168,10 @@ public func fileInput(name: String = "", message: String? = nil, successMessage:
 public func printWelcomeBanner(_ name: String) {
     #if DEBUG
     #else
+    let year = Calendar.current.component(.year, from: Date())
     print()
     print("JYMoleculeTool - \(name)")
-    print("Copyright © 2019 Jerry Yan. All rights reserved.")
+    print("Copyright © 2019 - \(year) Jerry Yan. All rights reserved.")
     print()
     #endif
 }

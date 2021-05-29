@@ -130,10 +130,10 @@ public extension String {
  */
 public func printStringInLine(_ str: String) {
     print(str, terminator: "\r")
-    #if os(Linux)
-    fflush(stdout)
-    #else
+    #if os(macOS)
     fflush(__stdoutp)
+    #else
+    fflush(stdout)
     #endif
 }
 

@@ -233,6 +233,11 @@ public struct TextFile: File {
      */
     public var content: String = ""
     
+    /**
+     The default option to the `add` function when the `print` argument is not specified.
+     */
+    public var defaultPrint: Bool = true
+    
     public init() {
         
     }
@@ -250,9 +255,10 @@ public struct TextFile: File {
         - terminator: The terminator to end the content. The default value is a new line ("\n")
         - print: If `true`, then the function will print the content to the console. The default value is `true`.
      */
-    public mutating func add(_ item: Any = "", terminator: String = "\n", print: Bool = true) {
+    public mutating func add(_ item: Any = "", terminator: String = "\n", print: Bool? = nil) {
         let str = String(describing: item) + terminator
-        if print {
+        let toPrint: Bool = print == nil ? defaultPrint : print!
+        if toPrint {
             Swift.print(str, terminator: "")
         }
         content.append(str)

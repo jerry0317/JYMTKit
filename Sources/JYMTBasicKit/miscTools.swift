@@ -25,6 +25,11 @@ public enum SFProgramMode {
      The ordinary mode.
      */
     case ordinary
+    
+    /**
+     The clean mode that doesn't print the logging information.
+     */
+    case clean
 }
 
 /**
